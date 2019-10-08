@@ -1,0 +1,63 @@
+﻿@page "/counter"
+@using Blazor.Extensions
+
+<p>Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="ButtonPressed">Click me</button>
+
+@code {
+    [Inject]
+    private HubConnectionBuilder _hubConnectionBuilder { get; set; }
+    HubConnection connection;
+    int currentCount = 0;
+    bool isRunning = false;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        connection = _hubConnectionBuilder
+            .WithUrl("https://localhost:44314/counterhub", // The hub URL. If the Hub is hosted on the server where the blazor is hosted, you can just use the relative path.
+        opt =>
+        {
+            opt.LogLevel = SignalRLogLevel.Trace; // Client log level
+            opt.Transport = HttpTransportType.WebSockets; // Which transport you want to use for this connection
+        })
+        .Build(); // Build the HubConnection
+
+        connection.On<int>("UpdateCounter", this.UpdateCounter);
+        await connection.StartAsync();
+    }
+
+    Task UpdateCounter(int i)
+    {
+        currentCount = i;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    async Task IncrementCount()
+    {
+        currentCount++;
+        await connection.InvokeAsync("UpdateCounter", currentCount);
+    }
+
+    async Task AutoIncrementCount()
+    {
+        isRunning = true;
+        while(isRunning)
+        {
+            await Task.Delay(1000);
+            currentCount++;
+            await connection.InvokeAsync("UpdateCounter", currentCount);
+        }
+    }
+
+    async Task ButtonPressed()
+    {
+        if (isRunning)
+            isRunning = false;
+        else
+            await AutoIncrementCount();
+        
+    }
+}

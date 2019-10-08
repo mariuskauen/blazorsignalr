@@ -1,0 +1,52 @@
+﻿@inherits LayoutComponentBase
+@using Blazor.Extensions.Storage
+@using Services
+@inject LocalStorage localStorage
+@inject IAppState appState
+
+<div class="sidebar">
+    <NavMenu />
+</div>
+
+<div class="main">
+    @if (loggedIn)
+    {
+        <div class="top-row px-4">
+            <a href="javascript: void(0)" onclick="logout()" class="ml-md-auto">Logout</a>
+        </div>
+    }
+    else
+    {
+        <div class="top-row px-4">
+            <a href="http://blazor.net" target="_blank" class="ml-md-auto">About</a>
+        </div>
+    }
+    <div class="content px-4">
+        @Body
+    </div>
+</div>
+
+@code {
+    bool loggedIn;
+
+    private void login()
+    {
+        loggedIn = true;
+        StateHasChanged();
+    }
+    private async Task logout()
+    {
+        await localStorage.RemoveItem("token");
+        loggedIn = false;
+        StateHasChanged();
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        appState.Loggedin += login;
+        string token = await localStorage.GetItem<string>("token");
+        if (String.IsNullOrEmpty(token))
+            loggedIn = false;
+        else
+            loggedIn = true;
+    }
+}

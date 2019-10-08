@@ -1,0 +1,75 @@
+﻿@page "/login"
+@using System.Net.Http
+@using System.Net.Http.Headers
+@using System.Text.Json
+@using System.Text.Json.Serialization;
+@using Blazor.Extensions.Storage
+@using Services
+@inject HttpClient Http
+@inject SessionStorage sessionStorage
+@inject LocalStorage localStorage
+@inject IAppState  appState
+@inject NavigationManager navigationManager
+
+
+<EditForm Model="@login" OnValidSubmit="@PostRequest">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <InputText id="name" @bind-Value="@login.Username" />
+    <InputText id="pass" @bind-Value="@login.Password" />
+
+    <button type="submit">Submit</button>
+</EditForm>
+
+@code {
+
+    LoginCredentials login = new LoginCredentials();
+
+    public class LoginCredentials
+    {
+        public string Username { get; set; }
+
+        public string Password { get; set; }
+    }
+    public class TokenViewModel
+    {
+        [JsonPropertyName("token")]
+        public string Token { get; set; }
+    }
+
+    private async Task PostRequest()
+    {
+        var json = JsonSerializer.Serialize<LoginCredentials>(login);
+        var requestMessage = new HttpRequestMessage()
+        {
+            Method = new HttpMethod("POST"),
+            RequestUri = new Uri("https://localhost:44314/api/auth/login"),
+            Content =
+                new StringContent(json)
+        };
+
+        requestMessage.Content.Headers.ContentType =
+            new System.Net.Http.Headers.MediaTypeHeaderValue(
+                "application/json");
+
+
+        var response = await Http.SendAsync(requestMessage);
+        var responseStatusCode = response.StatusCode;
+        var responseBody = await response.Content.ReadAsStringAsync();
+        if (responseStatusCode == System.Net.HttpStatusCode.OK)
+        {
+            TokenViewModel token = JsonSerializer.Deserialize<TokenViewModel>(responseBody);
+
+            await localStorage.SetItem("token", token.Token);
+            appState.LoggedinRefresh();
+            navigationManager.NavigateTo("/");
+        }
+        else
+        {
+            Console.WriteLine(responseStatusCode.ToString());
+        }
+
+        //Console.WriteLine(await localStorage.GetItem<string>("token"));
+    }
+}
