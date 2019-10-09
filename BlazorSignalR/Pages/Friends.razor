@@ -29,7 +29,7 @@
                             </div>
                         </div>
                     </div>
-                }
+                    }
             </div>
         </div>
     }
@@ -49,6 +49,9 @@
 
         public string Fullname { get; set; }
 
+        [JsonPropertyName("online")]
+        public bool Online { get; set; }
+
         public Friend()
         {
             Fullname = Firstname + " " + Lastname;
@@ -60,7 +63,7 @@
     protected override async Task OnInitializedAsync()
     {
         string token = await localStorage.GetItem<string>("token");
-        Console.WriteLine(token);
+        //Console.WriteLine(token);
         if (String.IsNullOrEmpty(token))
         {
             loggedIn = false;
@@ -70,21 +73,10 @@
         Http.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
 
-        //var requestMessage = new HttpRequestMessage()
-        //{
-        //    Method = new HttpMethod("GET"),
-        //    RequestUri = new Uri("https://localhost:44314/api/friend/getallmyfriends")
-        //};
-
-        //requestMessage.Content.Headers.ContentType =
-        //    new System.Net.Http.Headers.MediaTypeHeaderValue(
-        //        "application/json");
-
         var response = await Http.GetAsync("https://localhost:44314/api/friend/getallmyfriends");
         var responseStatusCode = response.StatusCode;
         var responseBody = await response.Content.ReadAsStringAsync();
-        Console.WriteLine(responseBody);
+        //Console.WriteLine(responseBody);
         friends = JsonSerializer.Deserialize<Friend[]>(responseBody);
     }
-
 }

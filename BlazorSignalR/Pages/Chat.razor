@@ -2,9 +2,12 @@
 
 @using Blazor.Extensions
 @using Blazor.Extensions.Storage
+@using System.Net.Http
+@using System.Net.Http.Headers
 @using System.Text.Json
 @using System.Text.Json.Serialization;
 @inject LocalStorage  localStorage
+@inject HttpClient Http
 
 
 <div id="scrollbox">
@@ -20,8 +23,42 @@
     <textarea class="input-lg" placeholder="enter receiverId" @bind="@receiver"></textarea>
     <textarea class="input-lg" placeholder="enter your comment" @bind="@myMessage"></textarea>
     <button class="btn btn-default" @onclick="@SendMessage">Send</button>
+    <button class="btn btn-danger" @onclick="@Disconnect">Disconnect</button>
 </div>
+@if (loggedIn == true)
+{
+    @if (connected)
+    {
+        <div class="container">
+            <div class="row">
 
+                @foreach (Friend fr in friends)
+                {
+                    if (fr.Online)
+                    {
+                        <div class="col">
+                            <div class="card px-2" style="width: 10rem;" @onclick="@(e => clickedCard(fr.Username))">
+                                <img src="https://scontent.fosl3-2.fna.fbcdn.net/v/t1.0-9/11960226_118365771847090_8903831627453773999_n.jpg?_nc_cat=106&_nc_oc=AQm1Gq--bxQH8tOi2D5HZV4Yg2XeZoju10nQBXnI_B1cIJwfZ1qWnz9xkfrBWhr_UFqWjLmyl0RuxTB30Dw7BY9Q&_nc_ht=scontent.fosl3-2.fna&oh=b7af62b04d2e599840da08bd7cec516b&oe=5E2E0A83" class="card-img-top" alt="">
+                                <div class="card-body">
+                                    <h5 class="card-title">@fr.Username</h5>
+                                    <p class="card-text">@fr.Firstname @fr.Lastname</p>
+                                    @if (fr.Online)
+                                    {
+                                        <p>IS ONLINE! :D</p>
+                                    }
+                                    else
+                                    {
+                                        <p>IS NOT ONLINE! :(</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+}
 
 @code {
     [Inject]
@@ -31,30 +68,91 @@
     string token;
     string myMessage;
     string receiver;
+    bool connected;
+
+    Friend[] friends;
+    bool loggedIn;
     List<Message> messages = new List<Message>();
 
+
+    public class Friend
+    {
+        [JsonPropertyName("username")]
+        public string Username { get; set; }
+
+        [JsonPropertyName("firstname")]
+        public string Firstname { get; set; }
+
+        [JsonPropertyName("lastname")]
+        public string Lastname { get; set; }
+
+        public string Fullname { get; set; }
+
+        [JsonPropertyName("online")]
+        public bool Online { get; set; }
+
+        public Friend()
+        {
+            Fullname = Firstname + " " + Lastname;
+        }
+    }
     protected override async Task OnInitializedAsync()
     {
         token = await localStorage.GetItem<string>("token");
-
+        if (String.IsNullOrEmpty(token))
+        {
+            loggedIn = false;
+            return;
+        }
+        loggedIn = true;
         connection = _hubConnectionBuilder
             .WithUrl("https://localhost:44314/chathub", // The hub URL. If the Hub is hosted on the server where the blazor is hosted, you can just use the relative path.
         opt =>
         {
+            opt.AccessTokenProvider = () => Task.FromResult(token);
             opt.LogLevel = SignalRLogLevel.Trace; // Client log level
-            opt.Transport = HttpTransportType.WebSockets; // Which transport you want to use for this connection
-        })
+        opt.Transport = HttpTransportType.WebSockets; // Which transport you want to use for this connection
+    })
         .Build(); // Build the HubConnection
+
 
         connection.On<string>("Connected", this.AddGroup);
         connection.On<Message>("Message", this.ReceivedMessage);
+        connection.On<string>("FriendOnline", this.FriendOnline);
+        connection.On<string>("FriendOffline", this.FriendOffline);
         await connection.StartAsync();
+        connected = true;
+        //Console.WriteLine(token);
+
+
+        Http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.GetAsync("https://localhost:44314/api/friend/getallmyfriends");
+        var responseStatusCode = response.StatusCode;
+        var responseBody = await response.Content.ReadAsStringAsync();
+        //Console.WriteLine(responseBody);
+        friends = JsonSerializer.Deserialize<Friend[]>(responseBody);
+    }
+
+    async Task FriendOnline(string username)
+    {
+        friends.FirstOrDefault(f => f.Username == username).Online = true;
+        StateHasChanged();
+
+    }
+
+    async Task FriendOffline(string username)
+    {
+        friends.FirstOrDefault(f => f.Username == username).Online = false;
+        StateHasChanged();
+
     }
 
     async Task ReceivedMessage(Message message)
     {
         //Message message = JsonSerializer.Deserialize<Message>(mess);
-        Console.WriteLine(message.Content);
+        //Console.WriteLine(message.Content);
         messages.Add(message);
         StateHasChanged();
 
@@ -63,7 +161,7 @@
 
     async Task AddGroup(string noe)
     {
-        Console.WriteLine("Connected");
+        //Console.WriteLine("Connected");
         await connection.InvokeAsync("AddToGroup", token);
     }
 
@@ -84,24 +182,35 @@
         StateHasChanged();
     }
 
+    async Task clickedCard(string username)
+    {
+        receiver = username;
+        StateHasChanged();
+    }
+
+    async Task Disconnect()
+    {
+        await connection.StopAsync();
+        connected = false;
+    }
     public class Message
     {
-         [JsonPropertyName("content")]
+        [JsonPropertyName("content")]
         public string Content { get; set; }
 
-         [JsonPropertyName("token")]
+        [JsonPropertyName("token")]
         public string Token { get; set; }
 
-         [JsonPropertyName("receiver")]
+        [JsonPropertyName("receiver")]
         public string Receiver { get; set; }
 
-         [JsonPropertyName("receiverId")]
+        [JsonPropertyName("receiverId")]
         public string ReceiverId { get; set; }
 
-         [JsonPropertyName("senderId")]
+        [JsonPropertyName("senderId")]
         public string SenderId { get; set; }
 
-         [JsonPropertyName("sender")]
+        [JsonPropertyName("sender")]
         public string Sender { get; set; }
     }
 
