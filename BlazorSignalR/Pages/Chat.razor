@@ -1,0 +1,109 @@
+﻿@page "/chat"
+
+@using Blazor.Extensions
+@using Blazor.Extensions.Storage
+@using System.Text.Json
+@using System.Text.Json.Serialization;
+@inject LocalStorage  localStorage
+
+
+<div id="scrollbox">
+
+    @foreach (Message mess in messages)
+    {
+        <div>
+            <div><b>@mess.Sender</b></div>
+            <div>@mess.Content</div>
+        </div>
+    }
+    <hr />
+    <textarea class="input-lg" placeholder="enter receiverId" @bind="@receiver"></textarea>
+    <textarea class="input-lg" placeholder="enter your comment" @bind="@myMessage"></textarea>
+    <button class="btn btn-default" @onclick="@SendMessage">Send</button>
+</div>
+
+
+@code {
+    [Inject]
+    private HubConnectionBuilder _hubConnectionBuilder { get; set; }
+    HubConnection connection;
+
+    string token;
+    string myMessage;
+    string receiver;
+    List<Message> messages = new List<Message>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        token = await localStorage.GetItem<string>("token");
+
+        connection = _hubConnectionBuilder
+            .WithUrl("https://localhost:44314/chathub", // The hub URL. If the Hub is hosted on the server where the blazor is hosted, you can just use the relative path.
+        opt =>
+        {
+            opt.LogLevel = SignalRLogLevel.Trace; // Client log level
+            opt.Transport = HttpTransportType.WebSockets; // Which transport you want to use for this connection
+        })
+        .Build(); // Build the HubConnection
+
+        connection.On<string>("Connected", this.AddGroup);
+        connection.On<Message>("Message", this.ReceivedMessage);
+        await connection.StartAsync();
+    }
+
+    async Task ReceivedMessage(Message message)
+    {
+        //Message message = JsonSerializer.Deserialize<Message>(mess);
+        Console.WriteLine(message.Content);
+        messages.Add(message);
+        StateHasChanged();
+
+        return;
+    }
+
+    async Task AddGroup(string noe)
+    {
+        Console.WriteLine("Connected");
+        await connection.InvokeAsync("AddToGroup", token);
+    }
+
+    async Task SendMessage()
+    {
+        Message newMessage = new Message()
+        {
+            Sender = "Me",
+            SenderId = "",
+            Content = myMessage,
+            Receiver = receiver,
+            ReceiverId = "",
+            Token = token
+        };
+        await connection.InvokeAsync("SendMessage", newMessage);
+        messages.Add(newMessage);
+        myMessage = "";
+        StateHasChanged();
+    }
+
+    public class Message
+    {
+         [JsonPropertyName("content")]
+        public string Content { get; set; }
+
+         [JsonPropertyName("token")]
+        public string Token { get; set; }
+
+         [JsonPropertyName("receiver")]
+        public string Receiver { get; set; }
+
+         [JsonPropertyName("receiverId")]
+        public string ReceiverId { get; set; }
+
+         [JsonPropertyName("senderId")]
+        public string SenderId { get; set; }
+
+         [JsonPropertyName("sender")]
+        public string Sender { get; set; }
+    }
+
+}
+
