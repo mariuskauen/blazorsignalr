@@ -10,7 +10,6 @@
     private HubConnectionBuilder _hubConnectionBuilder { get; set; }
     HubConnection connection;
     int currentCount = 0;
-    bool isRunning = false;
 
 
     protected override async Task OnInitializedAsync()
@@ -28,36 +27,19 @@
         await connection.StartAsync();
     }
 
-    Task UpdateCounter(int i)
+    async Task UpdateCounter(int i)
     {
         currentCount = i;
         StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    async Task IncrementCount()
-    {
-        currentCount++;
-        await connection.InvokeAsync("UpdateCounter", currentCount);
-    }
-
-    async Task AutoIncrementCount()
-    {
-        isRunning = true;
-        while(isRunning)
-        {
-            await Task.Delay(1000);
-            currentCount++;
-            await connection.InvokeAsync("UpdateCounter", currentCount);
-        }
     }
 
     async Task ButtonPressed()
     {
-        if (isRunning)
-            isRunning = false;
-        else
-            await AutoIncrementCount();
-        
+        currentCount++;
+        await connection.InvokeAsync("ButtonPressed", currentCount);
     }
+
+
+
+
 }

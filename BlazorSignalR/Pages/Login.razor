@@ -6,12 +6,12 @@
 @using Blazor.Extensions.Storage
 @using Services
 @inject HttpClient Http
-@inject SessionStorage sessionStorage
 @inject LocalStorage localStorage
 @inject IAppState  appState
 @inject NavigationManager navigationManager
 
-
+@if (loggedIn == false)
+{
 <EditForm Model="@login" OnValidSubmit="@PostRequest">
     <DataAnnotationsValidator />
     <ValidationSummary />
@@ -21,8 +21,26 @@
 
     <button type="submit">Submit</button>
 </EditForm>
-
+}
 @code {
+    bool loggedIn;
+
+    protected override async Task OnInitializedAsync()
+    {
+        string token = await localStorage.GetItem<string>("token");
+        if (String.IsNullOrEmpty(token))
+        {
+            loggedIn = false;
+            StateHasChanged();
+            return;
+        }
+        else
+        {
+            loggedIn = true;
+            StateHasChanged();
+            return;
+        }
+    }
 
     LoginCredentials login = new LoginCredentials();
 
