@@ -6,6 +6,7 @@
 @using System.Text.Json
 @inject HttpClient Http
 @inject LocalStorage localStorage
+@inject NavigationManager navigationManager
 
 @if (loggedIn == true)
 {
@@ -40,8 +41,8 @@
                             <div class="card-body">
                                 <h5 class="card-title">@re.FriendName</h5>
                                 <p class="card-text">@re.RequestId</p>
-                                <a href="#" class="btn btn-primary">Accept friend</a>
-                                <a href="#" class="btn btn-primary">Ignore</a>
+                                <button class="btn btn-primary" @onclick="@(e => Accept(re.RequestId))">Accept friend</button>
+                                <button class="btn btn-primary">Ignore</button>
                             </div>
                         </div>
                     </div>
@@ -77,9 +78,10 @@
     Request[] othersRequests;
     AllRequests allRequests;
     bool loggedIn;
+    string token;
     protected override async Task OnInitializedAsync()
     {
-        string token = await localStorage.GetItem<string>("token");
+        token = await localStorage.GetItem<string>("token");
         Console.WriteLine(token);
         if (String.IsNullOrEmpty(token))
         {
@@ -100,5 +102,29 @@
         othersRequests = allRequests.Others.ToArray();
     }
 
+    async Task Accept(string requestid)
+    {
+        if (String.IsNullOrEmpty(token))
+        {
+            return;
+        }
+
+        //Console.WriteLine(friendid);
+
+        Http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var requestMessage = new HttpRequestMessage()
+        {
+            Method = new HttpMethod("POST"),
+            RequestUri = new Uri("https://localhost:44314/api/friend/acceptfriend/" + requestid)
+        };
+
+        var response = await Http.SendAsync(requestMessage);
+        var responseStatusCode = response.StatusCode;
+        var responseBody = await response.Content.ReadAsStringAsync();
+        //Console.WriteLine(responseBody);
+        navigationManager.NavigateTo("/");
+    }
 
 }

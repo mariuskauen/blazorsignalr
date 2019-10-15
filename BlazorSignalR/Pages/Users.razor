@@ -1,0 +1,108 @@
+﻿@page  "/users"
+@using System.Net.Http
+@using System.Net.Http.Headers
+@using System.Text.Json.Serialization;
+@using Blazor.Extensions.Storage
+@using System.Text.Json
+@inject HttpClient Http
+@inject LocalStorage localStorage
+
+@if (loggedIn == true)
+{
+    @if (users == null)
+    {
+        <textarea class="input-lg" placeholder="Search for user" @bind="@username"></textarea>
+        <button class="btn btn-primary" @onclick="@Search">Search</button>
+    }
+    else
+    {
+        <div class="container">
+            <textarea class="input-lg" placeholder="Search for user" @bind="@username"></textarea>
+            <button class="btn btn-primary" @onclick="@Search">Search</button>
+            <div class="row">
+
+                @foreach (User fr in users)
+                {
+                    <div class="col">
+                        <div class="card px-2" style="width: 18rem;">
+                            <img src="https://scontent.fosl3-2.fna.fbcdn.net/v/t1.0-9/11960226_118365771847090_8903831627453773999_n.jpg?_nc_cat=106&_nc_oc=AQm1Gq--bxQH8tOi2D5HZV4Yg2XeZoju10nQBXnI_B1cIJwfZ1qWnz9xkfrBWhr_UFqWjLmyl0RuxTB30Dw7BY9Q&_nc_ht=scontent.fosl3-2.fna&oh=b7af62b04d2e599840da08bd7cec516b&oe=5E2E0A83" class="card-img-top" alt="">
+                            <div class="card-body">
+                                <h5 class="card-title">@fr.Username</h5>
+                                <h5 class="card-title">@fr.UserId</h5>
+                                <button class="btn btn-primary" @onclick="@(e => Add(fr.UserId))">Add friend</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+@code {
+    public class User
+    {
+        [JsonPropertyName("userId")]
+        public string UserId { get; set; }
+
+        [JsonPropertyName("username")]
+        public string Username { get; set; }
+    }
+
+    User[] users;
+    bool loggedIn;
+    string username;
+    string token;
+
+    protected override async Task OnInitializedAsync()
+    {
+        token = await localStorage.GetItem<string>("token");
+        //Console.WriteLine(token);
+        if (String.IsNullOrEmpty(token))
+        {
+            loggedIn = false;
+            return;
+        }
+        loggedIn = true;
+    }
+
+    async Task Search()
+    {
+        if (String.IsNullOrEmpty(token))
+        {
+            loggedIn = false;
+            return;
+        }
+        loggedIn = true;
+        Http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await Http.GetAsync("https://localhost:44314/api/user/searchforuser?username=" + username);
+        var responseStatusCode = response.StatusCode;
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Console.WriteLine(responseBody);
+        users = JsonSerializer.Deserialize<User[]>(responseBody);
+    }
+        async Task Add(string userid)
+    {
+        if (String.IsNullOrEmpty(token))
+        {
+            return;
+        }
+
+        Console.WriteLine(userid);
+        
+        Http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+         var requestMessage = new HttpRequestMessage()
+        {
+            Method = new HttpMethod("POST"),
+            RequestUri = new Uri("https://localhost:44314/api/friend/addfriend/" + userid)
+        };
+
+        var response = await Http.SendAsync(requestMessage);
+        var responseStatusCode = response.StatusCode;
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Console.WriteLine(responseBody);
+    }
+}
